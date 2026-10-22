@@ -36,7 +36,8 @@ export function SiteHeader({
     <header className="sticky top-3 z-40 mb-5">
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 shadow-sm backdrop-blur sm:flex-nowrap">
         <Link href="/" className="mr-1 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white">智</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={SITE} className="h-8 w-8 rounded-xl object-cover" />
           <span className="whitespace-nowrap font-semibold">{SITE}</span>
         </Link>
         <nav className="flex items-center gap-1">
@@ -67,18 +68,42 @@ export function SiteHeader({
   );
 }
 
-/** 右下角在线客服（配置 NEXT_PUBLIC_SUPPORT_URL 后显示） */
-export function SupportButton() {
-  if (!SUPPORT_URL) return null;
+/** 客服微信二维码弹窗 */
+export function SupportModal({ onClose }: { onClose: () => void }) {
   return (
-    <a
-      href={SUPPORT_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-800"
-    >
-      🎧 {SUPPORT_TEXT}
-    </a>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 text-base font-semibold">联系客服</div>
+        <p className="mb-3 text-xs text-slate-500">微信扫码添加客服，催单 / 售后都可以找我</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/support-qr.jpg" alt="客服微信二维码" className="mx-auto w-full rounded-xl border border-slate-100" />
+        <p className="mt-3 text-xs text-slate-400">手机上可截图后用微信扫一扫，或在微信内长按识别</p>
+        {SUPPORT_URL && (
+          <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer" className="mt-2 block text-sm text-brand underline">
+            其他联系方式
+          </a>
+        )}
+        <button className="btn-ghost mt-4 w-full" onClick={onClose}>
+          关闭
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 右下角在线客服浮窗 */
+export function SupportButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-800"
+      >
+        🎧 {SUPPORT_TEXT}
+      </button>
+      {open && <SupportModal onClose={() => setOpen(false)} />}
+    </>
   );
 }
 

@@ -33,6 +33,8 @@ export default function AdminLogin() {
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
       <div className="card p-6">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="" className="mb-4 h-14 w-14 rounded-2xl object-cover" />
         <h1 className="text-lg font-semibold">管理员登录</h1>
         <p className="mb-4 mt-1 text-sm text-slate-500">请输入后台密码。</p>
         <input

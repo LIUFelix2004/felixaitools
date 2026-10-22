@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { SiteHeader, SupportButton } from "@/components/SiteChrome";
+import { SiteHeader, SupportButton, SupportModal } from "@/components/SiteChrome";
 
 type Order = {
   id: string;
@@ -65,6 +65,7 @@ function OrderInner() {
 /* ---------- 订单进度（凭订单号，不显示卡密） ---------- */
 
 function ProgressCard({ order }: { order: Order }) {
+  const [support, setSupport] = useState(false);
   return (
     <div className="card mb-5 p-5">
       <div className="mb-4 flex items-center justify-between">
@@ -88,6 +89,12 @@ function ProgressCard({ order }: { order: Order }) {
               ? "已发货！请在下方输入下单时填写的联系方式和查询密码查看卡密。"
               : "支付成功，客服正在为你人工发货，请耐心等待（本页会自动刷新进度）。发货后在下方输入联系方式 + 查询密码查看卡密。"}
           </p>
+          {order.status === "paid" && (
+            <button className="btn-ghost mt-3 w-full" onClick={() => setSupport(true)}>
+              🎧 {order.shipStatus === "shipped" ? "售后问题联系客服" : "等太久？联系客服催单"}
+            </button>
+          )}
+          {support && <SupportModal onClose={() => setSupport(false)} />}
         </>
       ) : (
         <FileSection order={order} />
