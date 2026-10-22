@@ -16,9 +16,10 @@ function hasChannel() {
   return !!(process.env.PUSHPLUS_TOKEN || process.env.SERVERCHAN_KEY || process.env.WECOM_WEBHOOK);
 }
 
-async function post(url: string, body: unknown) {
+async function postOnce(url: string, body: unknown) {
+  // 服务器在香港，访问国内推送服务较慢（实测 PushPlus 约 8s），超时放宽到 25s
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
+  const t = setTimeout(() => ctrl.abort(), 25000);
   try {
     const r = await fetch(url, {
       method: "POST",
@@ -29,6 +30,16 @@ async function post(url: string, body: unknown) {
     if (!r.ok) console.error("[notify]", url.split("?")[0], r.status, await r.text().catch(() => ""));
   } finally {
     clearTimeout(t);
+  }
+}
+
+/** 网络异常（超时/断连）时重试一次 */
+async function post(url: string, body: unknown) {
+  try {
+    await postOnce(url, body);
+  } catch (e) {
+    console.error("[notify] retry", url.split("?")[0], (e as Error)?.name);
+    await postOnce(url, body);
   }
 }
 
