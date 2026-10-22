@@ -51,7 +51,7 @@ export function SiteHeader({
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
             <input
-              className="input !rounded-xl !py-2 pl-9"
+              className="input !rounded-xl !py-2 !pl-9"
               placeholder="搜索商品关键词"
               value={q}
               onChange={(e) => {
