@@ -2,8 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-
-const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "发卡商城";
+import { SiteHeader, SupportButton } from "@/components/SiteChrome";
 
 type Order = {
   id: string;
@@ -52,20 +51,13 @@ function OrderInner() {
   }, [orderParam]);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
-      <header className="mb-5 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand font-bold text-white">智</div>
-          <span className="font-semibold">{SITE}</span>
-        </a>
-        <a href="/" className="text-sm text-slate-500 hover:text-brand">
-          ← 返回商城
-        </a>
-      </header>
-
-      {current && <ProgressCard order={current} />}
-
-      <QueryCard />
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-3">
+      <SiteHeader active="order" />
+      <div className="mx-auto max-w-2xl">
+        {current && <ProgressCard order={current} />}
+        <QueryCard />
+      </div>
+      <SupportButton />
     </div>
   );
 }

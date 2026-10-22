@@ -58,7 +58,10 @@ function migrate(d: DatabaseSync) {
       type        TEXT NOT NULL DEFAULT 'card',   -- card(秒发卡密) | file(卡密+上传文件)
       status      TEXT NOT NULL DEFAULT 'on',      -- on | off
       sort        INTEGER NOT NULL DEFAULT 0,
-      created_at  INTEGER NOT NULL
+      created_at  INTEGER NOT NULL,
+      image       TEXT,                            -- 商品图文件名（uploads/products/ 下）
+      tags        TEXT,                            -- 标签，逗号分隔
+      specs       TEXT                             -- 规格 JSON：[{"name":"10亿额度","price":18}]
     );
 
     -- 卡密库存池（仅 card 类商品使用）
@@ -137,15 +140,18 @@ function migrate(d: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_files_sub ON files(submission_id);
   `);
 
-  // 旧库升级：给已存在的 orders 表补列（列已存在时 ALTER 会报错，忽略即可）
-  for (const col of [
-    "query_password TEXT",
-    "ship_status TEXT",
-    "card_content TEXT",
-    "shipped_at INTEGER",
+  // 旧库升级：补列（列已存在时 ALTER 会报错，忽略即可）
+  for (const [table, col] of [
+    ["orders", "query_password TEXT"],
+    ["orders", "ship_status TEXT"],
+    ["orders", "card_content TEXT"],
+    ["orders", "shipped_at INTEGER"],
+    ["products", "image TEXT"],
+    ["products", "tags TEXT"],
+    ["products", "specs TEXT"],
   ]) {
     try {
-      d.exec(`ALTER TABLE orders ADD COLUMN ${col}`);
+      d.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
     } catch {}
   }
   d.exec(`CREATE INDEX IF NOT EXISTS idx_orders_contact ON orders(contact)`);

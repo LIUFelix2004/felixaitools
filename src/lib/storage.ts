@@ -32,3 +32,22 @@ export function storedPath(storedName: string) {
 export async function saveBuffer(storedName: string, buf: Buffer) {
   await fs.promises.writeFile(storedPath(storedName), buf);
 }
+
+/* ---------- 商品图片（公开访问，与用户上传的资料分开存放） ---------- */
+
+export const PRODUCT_IMG_DIR = path.join(UPLOAD_DIR, "products");
+if (!fs.existsSync(PRODUCT_IMG_DIR)) fs.mkdirSync(PRODUCT_IMG_DIR, { recursive: true });
+
+export const MAX_IMAGE_SIZE = 3 * 1024 * 1024; // 3MB
+
+export const IMAGE_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+export function productImagePath(name: string) {
+  return path.join(PRODUCT_IMG_DIR, path.basename(name));
+}

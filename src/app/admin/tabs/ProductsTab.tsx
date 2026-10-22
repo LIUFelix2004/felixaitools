@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "./ui";
 
 type Category = { id: string; name: string; sort: number; product_count: number };
+type Spec = { name: string; price: number };
 type Product = {
   id: string;
   categoryId: string | null;
@@ -14,8 +15,13 @@ type Product = {
   type: "card" | "file";
   status: "on" | "off";
   sort: number;
+  image: string | null;
+  tags: string[];
+  specs: Spec[];
   soldCount: number;
 };
+
+const imgUrl = (name: string | null | undefined) => (name ? `/api/img/${name}` : null);
 
 export default function ProductsTab({ guard }: { guard: (s: number) => void }) {
   const [cats, setCats] = useState<Category[]>([]);
@@ -39,7 +45,10 @@ export default function ProductsTab({ guard }: { guard: (s: number) => void }) {
 
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">商品</h2>
-        <button className="btn-primary !py-2" onClick={() => setEditing({ type: "card", status: "on", price: 0 })}>
+        <button
+          className="btn-primary !py-2"
+          onClick={() => setEditing({ type: "card", status: "on", price: 0, tags: [], specs: [] })}
+        >
           + 新增商品
         </button>
       </div>
@@ -67,14 +76,34 @@ export default function ProductsTab({ guard }: { guard: (s: number) => void }) {
             )}
             {prods.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
-                <td className="px-4 py-3">{p.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Thumb src={imgUrl(p.image)} size={40} />
+                    <div className="min-w-0">
+                      <div className="truncate">{p.name}</div>
+                      {p.tags.length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {p.tags.map((t) => (
+                            <span key={t} className="badge bg-slate-100 text-[11px] text-slate-500">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-slate-500">{p.categoryName || "—"}</td>
                 <td className="px-4 py-3">
                   <span className={`badge ${p.type === "card" ? "bg-emerald-50 text-emerald-600" : "bg-indigo-50 text-indigo-600"}`}>
                     {p.type === "card" ? "卡密·人工发货" : "文件处理"}
                   </span>
                 </td>
-                <td className="px-4 py-3">¥{p.price.toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  {p.specs.length
+                    ? `¥${Math.min(...p.specs.map((s) => s.price)).toFixed(2)} 起 · ${p.specs.length}个规格`
+                    : `¥${p.price.toFixed(2)}`}
+                </td>
                 <td className="px-4 py-3">{p.soldCount}</td>
                 <td className="px-4 py-3">
                   <span className={`badge ${p.status === "on" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
@@ -95,6 +124,20 @@ export default function ProductsTab({ guard }: { guard: (s: number) => void }) {
       {editing && (
         <ProductEditor cats={cats} product={editing} onClose={() => setEditing(null)} onSaved={load} />
       )}
+    </div>
+  );
+}
+
+function Thumb({ src, size }: { src: string | null; size: number }) {
+  return src ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" className="shrink-0 rounded-lg object-cover" style={{ width: size, height: size }} />
+  ) : (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400"
+      style={{ width: size, height: size }}
+    >
+      无图
     </div>
   );
 }
@@ -163,17 +206,56 @@ function ProductEditor({
     type: product.type ?? "card",
     status: product.status ?? "on",
     sort: product.sort ?? 0,
+    image: product.image ?? null,
   });
+  const [tagsText, setTagsText] = useState((product.tags || []).join("，"));
+  const [specs, setSpecs] = useState<{ name: string; price: string }[]>(
+    (product.specs || []).map((s) => ({ name: s.name, price: String(s.price) }))
+  );
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const r = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) {
+        alert(d.error || "上传失败");
+        return;
+      }
+      setF((x) => ({ ...x, image: d.name }));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const save = async () => {
-    if (!f.name || f.price == null) return;
+    if (!f.name) return;
+    const cleanSpecs = specs
+      .map((s) => ({ name: s.name.trim(), price: Number(s.price) }))
+      .filter((s) => s.name && s.price > 0);
+    if (specs.length && cleanSpecs.length !== specs.length) {
+      alert("规格的名称和价格都要填，价格需大于 0");
+      return;
+    }
+    // 有规格时，基础价格取最低规格价，方便列表展示
+    const price = cleanSpecs.length ? Math.min(...cleanSpecs.map((s) => s.price)) : Number(f.price);
+    if (!(price > 0)) {
+      alert("请填写价格");
+      return;
+    }
     setBusy(true);
     try {
+      const payload = { ...f, price, tags: tagsText, specs: cleanSpecs };
       const r = await fetch("/api/admin/products", {
         method: isNew ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isNew ? f : { id: product.id, ...f }),
+        body: JSON.stringify(isNew ? payload : { id: product.id, ...payload }),
       });
       if (r.ok) {
         onSaved();
@@ -196,6 +278,29 @@ function ProductEditor({
   return (
     <Drawer title={isNew ? "新增商品" : "编辑商品"} onClose={onClose}>
       <div className="space-y-3 text-sm">
+        <Field label="商品图片">
+          <div className="flex items-center gap-3">
+            <Thumb src={imgUrl(f.image)} size={72} />
+            <div className="space-y-1.5">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+              />
+              <button className="btn-ghost !py-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? "上传中…" : f.image ? "更换图片" : "上传图片"}
+              </button>
+              {f.image && (
+                <button className="ml-2 text-xs text-red-500 hover:underline" onClick={() => setF({ ...f, image: null })}>
+                  移除
+                </button>
+              )}
+              <p className="text-xs text-slate-400">建议正方形，jpg/png/webp，≤3MB</p>
+            </div>
+          </div>
+        </Field>
         <Field label="商品名 *">
           <input className="input" value={f.name || ""} onChange={(e) => setF({ ...f, name: e.target.value })} />
         </Field>
@@ -221,11 +326,56 @@ function ProductEditor({
           </select>
           {!isNew && <p className="mt-1 text-xs text-slate-400">类型创建后不可更改</p>}
         </Field>
-        <Field label="价格 (¥)">
-          <input type="number" step="0.01" className="input" value={f.price ?? 0} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} />
+        <Field label="标签（逗号分隔，最多 8 个）">
+          <input
+            className="input"
+            placeholder="例如：成品账号，推荐，人手一个"
+            value={tagsText}
+            onChange={(e) => setTagsText(e.target.value)}
+          />
         </Field>
-        <Field label="描述">
-          <textarea className="input min-h-[72px]" value={f.description || ""} onChange={(e) => setF({ ...f, description: e.target.value })} />
+
+        <Field label="规格（可选：同一商品多个档位、不同价格）">
+          <div className="space-y-2">
+            {specs.map((s, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  className="input !py-1.5"
+                  placeholder="规格名，如 10亿额度成品号"
+                  value={s.name}
+                  onChange={(e) => setSpecs(specs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                />
+                <input
+                  className="input !py-1.5 w-24"
+                  type="number"
+                  step="0.01"
+                  placeholder="价格"
+                  value={s.price}
+                  onChange={(e) => setSpecs(specs.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))}
+                />
+                <button className="px-1 text-slate-400 hover:text-red-500" onClick={() => setSpecs(specs.filter((_, j) => j !== i))}>
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button className="btn-ghost !py-1.5" onClick={() => setSpecs([...specs, { name: "", price: "" }])}>
+              + 添加规格
+            </button>
+          </div>
+        </Field>
+
+        {specs.length === 0 && (
+          <Field label="价格 (¥) *">
+            <input type="number" step="0.01" className="input" value={f.price ?? 0} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} />
+          </Field>
+        )}
+        <Field label="商品详情（显示在详情页，可写质保、使用教程，支持换行）">
+          <textarea
+            className="input min-h-[140px]"
+            placeholder={"质保政策：\n使用方法：\n1. ...\n2. ..."}
+            value={f.description || ""}
+            onChange={(e) => setF({ ...f, description: e.target.value })}
+          />
         </Field>
         <Field label="排序（小的在前）">
           <input type="number" className="input" value={f.sort ?? 0} onChange={(e) => setF({ ...f, sort: Number(e.target.value) })} />
@@ -238,7 +388,7 @@ function ProductEditor({
         </Field>
 
         <div className="flex gap-2 pt-2">
-          <button className="btn-primary flex-1" onClick={save} disabled={busy || !f.name}>
+          <button className="btn-primary flex-1" onClick={save} disabled={busy || uploading || !f.name}>
             {busy ? "保存中…" : "保存"}
           </button>
           {!isNew && (

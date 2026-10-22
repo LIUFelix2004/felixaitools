@@ -13,7 +13,52 @@ export type Product = {
   status: "on" | "off";
   sort: number;
   created_at: number;
+  image: string | null;
+  tags: string | null;
+  specs: string | null;
 };
+
+export type Spec = { name: string; price: number };
+
+/** 解析规格 JSON，过滤非法项 */
+export function parseSpecs(raw: string | null): Spec[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((s: any) => ({ name: String(s?.name ?? "").trim(), price: Number(s?.price) }))
+      .filter((s) => s.name && Number.isFinite(s.price) && s.price > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function parseTags(raw: string | null): string[] {
+  return (raw || "")
+    .split(/[,，]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+/** 对外展示的商品结构（首页卡片 / 详情页共用） */
+function toPublic(p: Product) {
+  const specs = parseSpecs(p.specs);
+  const minPrice = specs.length ? Math.min(...specs.map((s) => s.price)) : p.price;
+  return {
+    id: p.id,
+    categoryId: p.category_id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    minPrice,
+    type: p.type,
+    image: p.image ? `/api/img/${p.image}` : null,
+    tags: parseTags(p.tags),
+    specs,
+  };
+}
 
 /** 查询密码只存哈希 */
 export function hashQueryPassword(pw: string) {
@@ -27,15 +72,12 @@ export function catalog() {
     .prepare(`SELECT * FROM products WHERE status = 'on' ORDER BY sort, created_at`)
     .all() as Product[];
   return {
-    categories: cats.map((c) => ({ id: c.id, name: c.name })),
-    products: prods.map((p) => ({
-      id: p.id,
-      categoryId: p.category_id,
-      name: p.name,
-      description: p.description,
-      price: p.price,
-      type: p.type,
+    categories: cats.map((c) => ({
+      id: c.id,
+      name: c.name,
+      count: prods.filter((p) => p.category_id === c.id).length,
     })),
+    products: prods.map(toPublic),
   };
 }
 
@@ -43,9 +85,17 @@ export function getProduct(id: string): Product | undefined {
   return db.prepare(`SELECT * FROM products WHERE id = ?`).get(id) as Product | undefined;
 }
 
+/** 详情页用：仅返回上架商品 */
+export function publicProduct(id: string) {
+  const p = getProduct(id);
+  if (!p || p.status !== "on") return null;
+  return toPublic(p);
+}
+
 /** 下单（含校验）：联系方式、查询密码必填 */
 export function createOrder(input: {
   productId: string;
+  specIndex?: number;
   quantity: number;
   contact: string;
   queryPassword: string;
@@ -56,7 +106,18 @@ export function createOrder(input: {
   if (!p || p.status !== "on") throw new Error("商品不存在或已下架");
   const qty = Math.max(1, Math.min(Math.floor(input.quantity || 1), 100));
 
-  const amount = Math.round(p.price * qty * 100) / 100;
+  // 有规格时必须选规格，价格和名称以规格为准（服务端定价，不信任前端传价）
+  const specs = parseSpecs(p.specs);
+  let unitPrice = p.price;
+  let displayName = p.name;
+  if (specs.length) {
+    const spec = specs[Number(input.specIndex)];
+    if (!spec) throw new Error("请选择商品规格");
+    unitPrice = spec.price;
+    displayName = `${p.name}（${spec.name}）`;
+  }
+
+  const amount = Math.round(unitPrice * qty * 100) / 100;
   const id = "NO" + nanoid(14).toUpperCase();
   db.prepare(
     `INSERT INTO orders
@@ -66,9 +127,9 @@ export function createOrder(input: {
   ).run(
     id,
     p.id,
-    p.name,
+    displayName,
     p.type,
-    p.price,
+    unitPrice,
     qty,
     amount,
     input.email ?? "",
@@ -77,7 +138,7 @@ export function createOrder(input: {
     input.provider,
     Date.now()
   );
-  return { orderId: id, amount, productType: p.type, productName: p.name };
+  return { orderId: id, amount, productType: p.type, productName: displayName };
 }
 
 /**

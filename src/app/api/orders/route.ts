@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     order = createOrder({
       productId: String(body.productId || ""),
+      specIndex: body.specIndex == null ? undefined : Number(body.specIndex),
       quantity: Number(body.quantity || 1),
       contact,
       queryPassword,

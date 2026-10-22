@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "node:path";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
+import { parseSpecs, parseTags } from "@/lib/shop";
 
 export const runtime = "nodejs";
+
+/** 规范化前端传来的规格 / 标签 / 图片名 */
+function normSpecs(v: unknown): string | null {
+  const specs = parseSpecs(JSON.stringify(Array.isArray(v) ? v : []));
+  return specs.length ? JSON.stringify(specs) : null;
+}
+function normTags(v: unknown): string | null {
+  const tags = parseTags(Array.isArray(v) ? v.join(",") : String(v ?? ""));
+  return tags.length ? tags.join(",") : null;
+}
+function normImage(v: unknown): string | null {
+  return v ? path.basename(String(v)) : null;
+}
 
 export async function GET() {
   if (!isAuthed()) return NextResponse.json({ error: "未登录" }, { status: 401 });
@@ -25,6 +40,9 @@ export async function GET() {
       type: p.type,
       status: p.status,
       sort: p.sort,
+      image: p.image,
+      tags: parseTags(p.tags),
+      specs: parseSpecs(p.specs),
       soldCount:
         (db.prepare(`SELECT COUNT(*) n FROM orders WHERE product_id = ? AND status = 'paid'`).get(p.id) as any).n,
     })),
@@ -38,8 +56,8 @@ export async function POST(req: NextRequest) {
   const type = b.type === "file" ? "file" : "card";
   const id = "P" + nanoid(10);
   db.prepare(
-    `INSERT INTO products (id, category_id, name, description, price, type, status, sort, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO products (id, category_id, name, description, price, type, status, sort, created_at, image, tags, specs)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     b.categoryId || null,
@@ -49,7 +67,10 @@ export async function POST(req: NextRequest) {
     type,
     b.status === "off" ? "off" : "on",
     Number(b.sort) || 0,
-    Date.now()
+    Date.now(),
+    normImage(b.image),
+    normTags(b.tags),
+    normSpecs(b.specs)
   );
   return NextResponse.json({ ok: true, id });
 }
@@ -72,6 +93,9 @@ export async function PATCH(req: NextRequest) {
   if (b.type != null) set("type", b.type === "file" ? "file" : "card");
   if (b.status != null) set("status", b.status === "off" ? "off" : "on");
   if (b.sort != null) set("sort", Number(b.sort));
+  if (b.image !== undefined) set("image", normImage(b.image));
+  if (b.tags !== undefined) set("tags", normTags(b.tags));
+  if (b.specs !== undefined) set("specs", normSpecs(b.specs));
   if (fields.length === 0) return NextResponse.json({ error: "无更新内容" }, { status: 400 });
 
   args.push(b.id);
