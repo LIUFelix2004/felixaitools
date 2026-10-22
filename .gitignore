@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+*.log
+.env.local
+.DS_Store
+
+# runtime data (DB + uploaded files) — never commit user submissions
+/data
+/uploads
