@@ -9,3 +9,6 @@ out
 /data
 /uploads
 .deploy/
+
+# 客服二维码（私有，部署时单独放，不进仓库）
+/public/support-qr.jpg
