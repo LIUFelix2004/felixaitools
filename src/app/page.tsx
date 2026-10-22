@@ -13,7 +13,6 @@ type Product = {
   description: string | null;
   price: number;
   type: "card" | "file";
-  stock: number | null;
 };
 
 export default function Shop() {
@@ -104,14 +103,13 @@ export default function Shop() {
       {buying && <BuyModal product={buying} onClose={() => setBuying(null)} />}
 
       <footer className="mt-10 text-center text-xs text-slate-400">
-        {SITE} · 自动发卡 · 付款即时到账
+        {SITE} · 付款后人工发货 · 凭联系方式 + 查询密码查看卡密
       </footer>
     </div>
   );
 }
 
 function ProductCard({ p, onBuy }: { p: Product; onBuy: () => void }) {
-  const soldOut = p.type === "card" && (p.stock ?? 0) <= 0;
   return (
     <div className="card flex flex-col p-4">
       <div className="flex items-start justify-between gap-2">
@@ -121,19 +119,16 @@ function ProductCard({ p, onBuy }: { p: Product; onBuy: () => void }) {
             p.type === "card" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700"
           }`}
         >
-          {p.type === "card" ? "秒发" : "需上传文件"}
+          {p.type === "card" ? "人工发货" : "需上传文件"}
         </span>
       </div>
       {p.description && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{p.description}</p>}
       <div className="mt-3 flex items-end justify-between">
         <div className="text-brand">
           <span className="text-lg font-bold">¥{p.price.toFixed(2)}</span>
-          {p.type === "card" && (
-            <span className="ml-2 text-xs text-slate-400">库存 {p.stock}</span>
-          )}
         </div>
-        <button className="btn-primary !px-4 !py-2 text-sm" onClick={onBuy} disabled={soldOut}>
-          {soldOut ? "已售罄" : "购买"}
+        <button className="btn-primary !px-4 !py-2 text-sm" onClick={onBuy}>
+          购买
         </button>
       </div>
     </div>
@@ -143,6 +138,7 @@ function ProductCard({ p, onBuy }: { p: Product; onBuy: () => void }) {
 function BuyModal({ product, onClose }: { product: Product; onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
+  const [queryPassword, setQueryPassword] = useState("");
   const [qty, setQty] = useState(1);
   const [paytype, setPaytype] = useState("alipay");
   const [busy, setBusy] = useState(false);
@@ -153,13 +149,22 @@ function BuyModal({ product, onClose }: { product: Product; onClose: () => void 
     { code: "wxpay", label: "微信" },
   ];
 
-  const max = product.type === "card" ? Math.max(1, product.stock ?? 1) : 99;
+  const max = 99;
   const total = (product.price * qty).toFixed(2);
+  const ready = contact.trim().length >= 3 && queryPassword.trim().length >= 4;
 
   const buy = async () => {
     setErr("");
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      setErr("请填写正确的邮箱（用于找回订单）");
+    if (contact.trim().length < 3) {
+      setErr("请填写联系方式（QQ/微信/手机/邮箱）");
+      return;
+    }
+    if (queryPassword.trim().length < 4) {
+      setErr("查询密码至少 4 位，请牢记，查看卡密时要用");
+      return;
+    }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setErr("邮箱格式不正确");
       return;
     }
     setBusy(true);
@@ -167,7 +172,7 @@ function BuyModal({ product, onClose }: { product: Product; onClose: () => void 
       const r = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: product.id, quantity: qty, email, contact, paytype }),
+        body: JSON.stringify({ productId: product.id, quantity: qty, email, contact, queryPassword, paytype }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -212,16 +217,26 @@ function BuyModal({ product, onClose }: { product: Product; onClose: () => void 
               <button className="btn-ghost !px-3 !py-1.5" onClick={() => setQty((q) => Math.min(max, q + 1))}>
                 ＋
               </button>
-              {product.type === "card" && <span className="text-xs text-slate-400">库存 {product.stock}</span>}
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-slate-600">邮箱 *（用于找回订单）</label>
-            <input className="input" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label className="mb-1 block text-sm text-slate-600">联系方式 *</label>
+            <input className="input" placeholder="QQ / 微信 / 手机 / 邮箱" value={contact} onChange={(e) => setContact(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-slate-600">联系方式（选填）</label>
-            <input className="input" placeholder="QQ / 微信" value={contact} onChange={(e) => setContact(e.target.value)} />
+            <label className="mb-1 block text-sm text-slate-600">查询密码 *（查看卡密时要用，请牢记）</label>
+            <input
+              className="input"
+              type="text"
+              autoComplete="off"
+              placeholder="自己设一个，至少 4 位"
+              value={queryPassword}
+              onChange={(e) => setQueryPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-slate-600">邮箱（选填）</label>
+            <input className="input" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
             <label className="mb-1 block text-sm text-slate-600">支付方式</label>
@@ -242,6 +257,11 @@ function BuyModal({ product, onClose }: { product: Product; onClose: () => void 
               ))}
             </div>
           </div>
+          {product.type === "card" && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              付款后订单进入「发货中」，客服人工发货后，在「订单查询」输入联系方式 + 查询密码即可查看卡密。
+            </p>
+          )}
           {product.type === "file" && (
             <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-600">
               此商品为「需上传文件」类型：付款后会得到 CDK，在订单页上传资料文件，由后台处理。
@@ -250,7 +270,7 @@ function BuyModal({ product, onClose }: { product: Product; onClose: () => void 
           {err && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
         </div>
 
-        <button className="btn-primary mt-4 w-full" onClick={buy} disabled={busy || !email}>
+        <button className="btn-primary mt-4 w-full" onClick={buy} disabled={busy || !ready}>
           {busy ? "提交中…" : `去支付 ¥${total}`}
         </button>
       </div>

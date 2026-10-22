@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { orderDetail } from "@/lib/shop";
+import { queryOrders } from "@/lib/shop";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// 订单查询：按订单号精确，或按邮箱列出最近订单
-export async function GET(req: NextRequest) {
-  const q = (req.nextUrl.searchParams.get("q") || "").trim();
-  if (!q) return NextResponse.json({ error: "请输入订单号或邮箱" }, { status: 400 });
+// 订单查询：凭「联系方式 + 查询密码」查看订单与卡密（POST，避免密码出现在 URL）
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const contact = String(body.contact || "").trim();
+  const password = String(body.password || "").trim();
+  if (!contact || !password)
+    return NextResponse.json({ error: "请输入联系方式和查询密码" }, { status: 400 });
 
-  // 订单号直查
-  if (/^NO[A-Z0-9]+$/i.test(q)) {
-    const d = orderDetail(q.toUpperCase());
-    return NextResponse.json({ items: d ? [d] : [] });
-  }
-
-  // 邮箱列出
-  const rows = db
-    .prepare(`SELECT id FROM orders WHERE email = ? ORDER BY created_at DESC LIMIT 20`)
-    .all(q.toLowerCase()) as { id: string }[];
-  const items = rows.map((r) => orderDetail(r.id)).filter(Boolean);
-  return NextResponse.json({ items });
+  return NextResponse.json({ items: queryOrders(contact, password) });
 }

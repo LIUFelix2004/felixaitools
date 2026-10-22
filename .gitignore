@@ -8,3 +8,4 @@ out
 # runtime data (DB + uploaded files) — never commit user submissions
 /data
 /uploads
+.deploy/

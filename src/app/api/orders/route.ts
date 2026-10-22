@@ -14,9 +14,15 @@ function clientIp(req: NextRequest) {
 // 创建订单并返回支付链接
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  const contact = String(body.contact || "").trim();
+  const queryPassword = String(body.queryPassword || "").trim();
   const email = String(body.email || "").trim();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
-    return NextResponse.json({ error: "请填写正确的邮箱" }, { status: 400 });
+  if (contact.length < 3 || contact.length > 64)
+    return NextResponse.json({ error: "请填写联系方式（QQ/微信/手机/邮箱）" }, { status: 400 });
+  if (queryPassword.length < 4 || queryPassword.length > 32)
+    return NextResponse.json({ error: "查询密码需 4-32 位" }, { status: 400 });
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    return NextResponse.json({ error: "邮箱格式不正确" }, { status: 400 });
 
   const paytype = PAYTYPES[String(body.paytype || "")] ? String(body.paytype) : "alipay";
 
@@ -25,8 +31,9 @@ export async function POST(req: NextRequest) {
     order = createOrder({
       productId: String(body.productId || ""),
       quantity: Number(body.quantity || 1),
+      contact,
+      queryPassword,
       email,
-      contact: String(body.contact || "").trim(),
       provider: provider(),
     });
   } catch (e) {

@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
 
   // 基本校验
   if (!code) return NextResponse.json({ error: "缺少 CDK" }, { status: 400 });
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     return NextResponse.json({ error: "邮箱格式不正确" }, { status: 400 });
+  if (!email && !contact)
+    return NextResponse.json({ error: "缺少联系方式" }, { status: 400 });
   if (files.length === 0) return NextResponse.json({ error: "请至少上传一个文件" }, { status: 400 });
   if (files.length > MAX_FILES)
     return NextResponse.json({ error: `最多上传 ${MAX_FILES} 个文件` }, { status: 400 });

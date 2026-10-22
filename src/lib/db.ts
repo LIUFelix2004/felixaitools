@@ -87,7 +87,11 @@ function migrate(d: DatabaseSync) {
       provider     TEXT NOT NULL,
       pay_ref      TEXT,
       created_at   INTEGER NOT NULL,
-      paid_at      INTEGER
+      paid_at      INTEGER,
+      query_password TEXT,                          -- 查询密码（sha256）
+      ship_status  TEXT,                            -- card: waiting(发货中) | shipped(已发货)
+      card_content TEXT,                            -- 人工发货的卡密内容
+      shipped_at   INTEGER
     );
 
     -- CDK（仅 file 类商品：支付后生成，用户凭它上传文件）
@@ -132,6 +136,19 @@ function migrate(d: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status);
     CREATE INDEX IF NOT EXISTS idx_files_sub ON files(submission_id);
   `);
+
+  // 旧库升级：给已存在的 orders 表补列（列已存在时 ALTER 会报错，忽略即可）
+  for (const col of [
+    "query_password TEXT",
+    "ship_status TEXT",
+    "card_content TEXT",
+    "shipped_at INTEGER",
+  ]) {
+    try {
+      d.exec(`ALTER TABLE orders ADD COLUMN ${col}`);
+    } catch {}
+  }
+  d.exec(`CREATE INDEX IF NOT EXISTS idx_orders_contact ON orders(contact)`);
 }
 
 export type OrderStatus = "pending" | "paid";

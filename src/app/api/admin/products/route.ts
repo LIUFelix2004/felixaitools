@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
-import { stockOf } from "@/lib/shop";
 
 export const runtime = "nodejs";
 
@@ -26,7 +25,6 @@ export async function GET() {
       type: p.type,
       status: p.status,
       sort: p.sort,
-      stock: p.type === "card" ? stockOf(p.id) : null,
       soldCount:
         (db.prepare(`SELECT COUNT(*) n FROM orders WHERE product_id = ? AND status = 'paid'`).get(p.id) as any).n,
     })),
