@@ -47,9 +47,9 @@ AUTH_SECRET=换成一段很长的随机字符串
 # 支付：正式收款用 jhup
 PAYMENT_PROVIDER=jhup
 JHUP_API_URL=https://pay.jhup.cn
-JHUP_PID=你的商户编号
+JHUP_PID=你的商户编号(2088开头)
 JHUP_KEY=你的MD5商户密钥
-SITE_URL=https://felixaitools.shop
+SITE_URL=https://你的域名
 ```
 
 > 密钥建议在 jhup 商户后台重置一次再填，避免用调试期泄露过的旧密钥。
